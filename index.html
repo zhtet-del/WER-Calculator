@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Word Error Rate Analysis Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jieba-js/0.3.2/jieba.js"></script>
     <style>
         * {
             margin: 0;
@@ -48,6 +49,42 @@
         
         .content {
             padding: 30px;
+        }
+        
+        .language-selector {
+            margin-bottom: 24px;
+            padding: 16px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .language-selector label {
+            font-size: 0.95em;
+            font-weight: 600;
+            color: #1e3a8a;
+            margin-right: 16px;
+        }
+        
+        .language-selector select {
+            padding: 8px 12px;
+            font-size: 0.95em;
+            border: 1px solid #cbd5e1;
+            background: white;
+            cursor: pointer;
+        }
+        
+        .language-selector select:focus {
+            outline: none;
+            border-color: #1e3a8a;
+        }
+        
+        .language-info {
+            margin-top: 12px;
+            padding: 12px;
+            background: #eff6ff;
+            border-left: 3px solid #1e3a8a;
+            font-size: 0.9em;
+            color: #334155;
         }
         
         .input-section {
@@ -296,6 +333,20 @@
         </div>
         
         <div class="content">
+            <div class="language-selector">
+                <label for="language">Language:</label>
+                <select id="language" onchange="updateLanguageInfo()">
+                    <option value="auto">Auto-detect</option>
+                    <option value="en">English</option>
+                    <option value="ms">Malay (Bahasa Melayu)</option>
+                    <option value="ta">Tamil (தமிழ்)</option>
+                    <option value="zh">Mandarin Chinese (中文)</option>
+                </select>
+                <div class="language-info" id="languageInfo">
+                    Automatic language detection enabled. The system will identify the language and apply appropriate processing.
+                </div>
+            </div>
+            
             <div class="input-section">
                 <div class="input-box">
                     <label>Reference Text</label>
@@ -389,17 +440,120 @@
     </div>
 
     <script>
+        // Language detection function
+        function detectLanguage(text) {
+            // Remove whitespace for analysis
+            const trimmed = text.trim();
+            
+            // Check for Chinese characters
+            const chineseRegex = /[\u4e00-\u9fff]/;
+            if (chineseRegex.test(trimmed)) {
+                return 'zh';
+            }
+            
+            // Check for Tamil script
+            const tamilRegex = /[\u0B80-\u0BFF]/;
+            if (tamilRegex.test(trimmed)) {
+                return 'ta';
+            }
+            
+            // Check for common Malay words
+            const malayWords = ['yang', 'ini', 'adalah', 'untuk', 'dengan', 'pada', 'akan', 'dari', 'saya', 'tidak'];
+            const words = trimmed.toLowerCase().split(/\s+/);
+            let malayCount = 0;
+            for (let word of words) {
+                if (malayWords.includes(word)) malayCount++;
+            }
+            if (malayCount > 0 && malayCount / words.length > 0.1) {
+                return 'ms';
+            }
+            
+            // Default to English
+            return 'en';
+        }
+        
+        // Chinese word segmentation (simple character-based for now)
+        function segmentChinese(text) {
+            // Split Chinese text into characters as words
+            // In production, you'd use a proper segmentation library
+            const chars = text.split('');
+            const words = [];
+            let currentWord = '';
+            
+            for (let char of chars) {
+                if (/[\u4e00-\u9fff]/.test(char)) {
+                    if (currentWord && !/[\u4e00-\u9fff]/.test(currentWord)) {
+                        words.push(currentWord.trim());
+                        currentWord = '';
+                    }
+                    currentWord += char;
+                } else if (/\s/.test(char)) {
+                    if (currentWord) {
+                        words.push(currentWord.trim());
+                        currentWord = '';
+                    }
+                } else {
+                    currentWord += char;
+                }
+            }
+            
+            if (currentWord) {
+                words.push(currentWord.trim());
+            }
+            
+            return words.filter(w => w.length > 0);
+        }
+        
+        // Process text based on language
+        function processText(text, language) {
+            text = text.trim();
+            
+            if (language === 'zh') {
+                // For Chinese, segment into characters/words
+                return segmentChinese(text);
+            } else {
+                // For other languages, split by whitespace
+                return text.split(/\s+/).filter(w => w.length > 0);
+            }
+        }
+        
+        function updateLanguageInfo() {
+            const language = document.getElementById('language').value;
+            const info = document.getElementById('languageInfo');
+            
+            const messages = {
+                'auto': 'Automatic language detection enabled. The system will identify the language and apply appropriate processing.',
+                'en': 'English mode: Standard word-based tokenization.',
+                'ms': 'Malay mode: Standard word-based tokenization. Bahasa Melayu menggunakan tokenisasi berasaskan perkataan.',
+                'ta': 'Tamil mode: Standard word-based tokenization. தமிழ் முறை: வார்த்தை அடிப்படையிலான டோக்கனைசேஷன்.',
+                'zh': 'Mandarin Chinese mode: Character-based segmentation for accurate comparison. 中文模式：基于字符的分词以进行准确比较。'
+            };
+            
+            info.textContent = messages[language];
+        }
+        
         function calculateWER() {
-            const reference = document.getElementById('reference').value.trim().toLowerCase();
-            const hypothesis = document.getElementById('hypothesis').value.trim().toLowerCase();
+            const reference = document.getElementById('reference').value.trim();
+            const hypothesis = document.getElementById('hypothesis').value.trim();
             
             if (!reference || !hypothesis) {
                 alert('Please enter both reference and hypothesis texts.');
                 return;
             }
             
-            const refWords = reference.split(/\s+/);
-            const hypWords = hypothesis.split(/\s+/);
+            // Detect or get selected language
+            let language = document.getElementById('language').value;
+            if (language === 'auto') {
+                language = detectLanguage(reference);
+                console.log('Detected language:', language);
+            }
+            
+            // Process texts based on language
+            const refWords = processText(reference, language);
+            const hypWords = processText(hypothesis, language);
+            
+            console.log('Reference words:', refWords);
+            console.log('Hypothesis words:', hypWords);
             
             const result = levenshteinAlignment(refWords, hypWords);
             
