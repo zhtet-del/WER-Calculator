@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Word Error Rate Analysis Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #f5f5f5;
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border: 1px solid #ddd;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .header {
+            background: #1e3a8a;
+            color: white;
+            padding: 24px 30px;
+            border-bottom: 3px solid #1e40af;
+        }
+        
+        .header h1 {
+            font-size: 1.75em;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        
+        .header p {
+            font-size: 0.95em;
+            opacity: 0.95;
+            font-weight: 400;
+        }
+        
+        .content {
+            padding: 30px;
+        }
+        
+        .input-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        
+        .input-box {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .input-box label {
+            font-size: 0.95em;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #1e3a8a;
+        }
+        
+        .input-box textarea {
+            flex: 1;
+            min-height: 200px;
+            padding: 12px;
+            font-size: 0.95em;
+            border: 1px solid #cbd5e1;
+            resize: vertical;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            transition: border-color 0.2s;
+            background: #ffffff;
+        }
+        
+        .input-box textarea:focus {
+            outline: none;
+            border-color: #1e3a8a;
+        }
+        
+        .button-container {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        button {
+            background: #1e3a8a;
+            color: white;
+            border: none;
+            padding: 12px 36px;
+            font-size: 1em;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        
+        button:hover {
+            background: #1e40af;
+        }
+        
+        button:active {
+            background: #1e3a8a;
+        }
+        
+        .results {
+            display: none;
+        }
+        
+        .results.visible {
+            display: block;
+        }
+        
+        .section-title {
+            font-size: 1.1em;
+            font-weight: 600;
+            color: #1e3a8a;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        
+        .metric-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            padding: 20px;
+            transition: border-color 0.2s;
+        }
+        
+        .metric-card.primary {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+        }
+        
+        .metric-label {
+            font-size: 0.85em;
+            color: #64748b;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 500;
+        }
+        
+        .metric-value {
+            font-size: 2.25em;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        
+        .metric-card.primary .metric-value {
+            color: #1e40af;
+        }
+        
+        .detailed-results {
+            background: #fafafa;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .error-breakdown {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .error-item {
+            background: white;
+            padding: 16px;
+            border: 1px solid #e5e7eb;
+            border-left: 3px solid #1e3a8a;
+        }
+        
+        .error-item .error-type {
+            font-size: 0.85em;
+            color: #64748b;
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+        
+        .error-item .error-count {
+            font-size: 1.75em;
+            font-weight: 600;
+            color: #1e293b;
+        }
+        
+        .alignment-view {
+            background: white;
+            padding: 20px;
+            border: 1px solid #e5e7eb;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.8;
+            overflow-x: auto;
+        }
+        
+        .word-match {
+            color: #059669;
+            font-weight: 500;
+        }
+        
+        .word-substitution {
+            background: #fef3c7;
+            color: #92400e;
+            padding: 2px 5px;
+            border-bottom: 2px solid #f59e0b;
+            text-decoration: line-through;
+        }
+        
+        .word-deletion {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 2px 5px;
+            border-bottom: 2px solid #dc2626;
+            text-decoration: line-through;
+        }
+        
+        .word-insertion {
+            background: #dbeafe;
+            color: #1e40af;
+            padding: 2px 5px;
+            border-bottom: 2px solid #3b82f6;
+            font-style: italic;
+        }
+        
+        .legend {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 16px;
+            padding: 16px;
+            background: white;
+            border: 1px solid #e5e7eb;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.9em;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border: 1px solid #cbd5e1;
+        }
+        
+        .formula {
+            background: white;
+            padding: 16px;
+            margin-top: 16px;
+            border: 1px solid #e5e7eb;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #334155;
+        }
+        
+        @media (max-width: 768px) {
+            .input-section {
+                grid-template-columns: 1fr;
+            }
+            
+            .header h1 {
+                font-size: 1.5em;
+            }
+            
+            .metrics {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Word Error Rate Analysis Tool</h1>
+            <p>Transcription Quality Assessment System</p>
+        </div>
+        
+        <div class="content">
+            <div class="input-section">
+                <div class="input-box">
+                    <label>Reference Text</label>
+                    <textarea id="reference" placeholder="Enter the original reference text...">the quick brown fox jumps over the lazy dog</textarea>
+                </div>
+                <div class="input-box">
+                    <label>Hypothesis Text</label>
+                    <textarea id="hypothesis" placeholder="Enter the transcribed hypothesis text...">the quick brown fox jumped over a lazy dog</textarea>
+                </div>
+            </div>
+            
+            <div class="button-container">
+                <button onclick="calculateWER()">Calculate Metrics</button>
+            </div>
+            
+            <div class="results" id="results">
+                <h2 class="section-title">Performance Metrics</h2>
+                <div class="metrics">
+                    <div class="metric-card primary">
+                        <div class="metric-label">Word Error Rate</div>
+                        <div class="metric-value" id="wer">0.00%</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Word Accuracy</div>
+                        <div class="metric-value" id="accuracy">100.00%</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Match Error Rate</div>
+                        <div class="metric-value" id="mer">0.00%</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-label">Word Info Lost</div>
+                        <div class="metric-value" id="wil">0.00%</div>
+                    </div>
+                </div>
+                
+                <div class="detailed-results">
+                    <h3 class="section-title">Error Analysis</h3>
+                    <div class="error-breakdown">
+                        <div class="error-item">
+                            <div class="error-type">Reference Words</div>
+                            <div class="error-count" id="totalWords">0</div>
+                        </div>
+                        <div class="error-item">
+                            <div class="error-type">Correct Matches</div>
+                            <div class="error-count" id="matches">0</div>
+                        </div>
+                        <div class="error-item">
+                            <div class="error-type">Substitutions</div>
+                            <div class="error-count" id="substitutions">0</div>
+                        </div>
+                        <div class="error-item">
+                            <div class="error-type">Deletions</div>
+                            <div class="error-count" id="deletions">0</div>
+                        </div>
+                        <div class="error-item">
+                            <div class="error-type">Insertions</div>
+                            <div class="error-count" id="insertions">0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="formula">
+                        WER = (Substitutions + Deletions + Insertions) / Total Reference Words × 100%
+                    </div>
+                </div>
+                
+                <div class="detailed-results">
+                    <h3 class="section-title">Alignment Visualization</h3>
+                    <div class="legend">
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #059669;"></div>
+                            <span>Correct Match</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #fef3c7;"></div>
+                            <span>Substitution Error</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #fee2e2;"></div>
+                            <span>Deletion Error</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color" style="background: #dbeafe;"></div>
+                            <span>Insertion Error</span>
+                        </div>
+                    </div>
+                    <div class="alignment-view" id="alignment"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function calculateWER() {
+            const reference = document.getElementById('reference').value.trim().toLowerCase();
+            const hypothesis = document.getElementById('hypothesis').value.trim().toLowerCase();
+            
+            if (!reference || !hypothesis) {
+                alert('Please enter both reference and hypothesis texts.');
+                return;
+            }
+            
+            const refWords = reference.split(/\s+/);
+            const hypWords = hypothesis.split(/\s+/);
+            
+            const result = levenshteinAlignment(refWords, hypWords);
+            
+            const totalWords = refWords.length;
+            const wer = ((result.substitutions + result.deletions + result.insertions) / totalWords) * 100;
+            const mer = ((result.substitutions + result.deletions + result.insertions) / (totalWords + result.insertions)) * 100;
+            const wil = ((result.substitutions + result.deletions) / totalWords) * 100;
+            const accuracy = Math.max(0, 100 - wer);
+            
+            document.getElementById('wer').textContent = wer.toFixed(2) + '%';
+            document.getElementById('mer').textContent = mer.toFixed(2) + '%';
+            document.getElementById('wil').textContent = wil.toFixed(2) + '%';
+            document.getElementById('accuracy').textContent = accuracy.toFixed(2) + '%';
+            
+            document.getElementById('totalWords').textContent = totalWords;
+            document.getElementById('substitutions').textContent = result.substitutions;
+            document.getElementById('deletions').textContent = result.deletions;
+            document.getElementById('insertions').textContent = result.insertions;
+            document.getElementById('matches').textContent = result.matches;
+            
+            displayAlignment(result.alignment);
+            
+            document.getElementById('results').classList.add('visible');
+        }
+        
+        function levenshteinAlignment(ref, hyp) {
+            const n = ref.length;
+            const m = hyp.length;
+            
+            const dp = Array(n + 1).fill(null).map(() => Array(m + 1).fill(0));
+            
+            for (let i = 0; i <= n; i++) dp[i][0] = i;
+            for (let j = 0; j <= m; j++) dp[0][j] = j;
+            
+            for (let i = 1; i <= n; i++) {
+                for (let j = 1; j <= m; j++) {
+                    if (ref[i-1] === hyp[j-1]) {
+                        dp[i][j] = dp[i-1][j-1];
+                    } else {
+                        dp[i][j] = Math.min(
+                            dp[i-1][j] + 1,
+                            dp[i][j-1] + 1,
+                            dp[i-1][j-1] + 1
+                        );
+                    }
+                }
+            }
+            
+            const alignment = [];
+            let i = n, j = m;
+            let substitutions = 0, deletions = 0, insertions = 0, matches = 0;
+            
+            while (i > 0 || j > 0) {
+                if (i > 0 && j > 0 && ref[i-1] === hyp[j-1]) {
+                    alignment.unshift({type: 'match', ref: ref[i-1], hyp: hyp[j-1]});
+                    matches++;
+                    i--; j--;
+                } else if (i > 0 && j > 0 && dp[i][j] === dp[i-1][j-1] + 1) {
+                    alignment.unshift({type: 'substitution', ref: ref[i-1], hyp: hyp[j-1]});
+                    substitutions++;
+                    i--; j--;
+                } else if (i > 0 && dp[i][j] === dp[i-1][j] + 1) {
+                    alignment.unshift({type: 'deletion', ref: ref[i-1], hyp: null});
+                    deletions++;
+                    i--;
+                } else {
+                    alignment.unshift({type: 'insertion', ref: null, hyp: hyp[j-1]});
+                    insertions++;
+                    j--;
+                }
+            }
+            
+            return {
+                alignment,
+                substitutions,
+                deletions,
+                insertions,
+                matches
+            };
+        }
+        
+        function displayAlignment(alignment) {
+            let refLine = 'REF: ';
+            let hypLine = 'HYP: ';
+            
+            alignment.forEach(item => {
+                if (item.type === 'match') {
+                    refLine += `<span class="word-match">${item.ref}</span> `;
+                    hypLine += `<span class="word-match">${item.hyp}</span> `;
+                } else if (item.type === 'substitution') {
+                    refLine += `<span class="word-substitution">${item.ref}</span> `;
+                    hypLine += `<span class="word-substitution">${item.hyp}</span> `;
+                } else if (item.type === 'deletion') {
+                    refLine += `<span class="word-deletion">${item.ref}</span> `;
+                    hypLine += `<span class="word-deletion">***</span> `;
+                } else if (item.type === 'insertion') {
+                    refLine += `<span class="word-insertion">***</span> `;
+                    hypLine += `<span class="word-insertion">${item.hyp}</span> `;
+                }
+            });
+            
+            document.getElementById('alignment').innerHTML = refLine + '<br><br>' + hypLine;
+        }
+    </script>
+</body>
+</html>
