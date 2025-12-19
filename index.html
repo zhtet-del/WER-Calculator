@@ -78,6 +78,30 @@
             border-color: #1e3a8a;
         }
         
+        .normalization-options {
+            margin-top: 12px;
+            padding: 12px;
+            background: white;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .normalization-options label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9em;
+            font-weight: 400;
+            color: #334155;
+            margin-bottom: 8px;
+            cursor: pointer;
+        }
+        
+        .normalization-options input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+        
         .language-info {
             margin-top: 12px;
             padding: 12px;
@@ -345,6 +369,20 @@
                 <div class="language-info" id="languageInfo">
                     Automatic language detection enabled. The system will identify the language and apply appropriate processing.
                 </div>
+                <div class="normalization-options">
+                    <label>
+                        <input type="checkbox" id="normalizeNumbers" checked>
+                        Normalize numbers (e.g., "2025" ↔ "twenty twenty five")
+                    </label>
+                    <label>
+                        <input type="checkbox" id="normalizeAbbreviations" checked>
+                        Normalize abbreviations (e.g., "Dr." ↔ "doctor", "Mr." ↔ "mister")
+                    </label>
+                    <label>
+                        <input type="checkbox" id="normalizeHyphens" checked>
+                        Normalize hyphens (e.g., "side-by-side" ↔ "side by side")
+                    </label>
+                </div>
             </div>
             
             <div class="input-section">
@@ -440,6 +478,97 @@
     </div>
 
     <script>
+        // Number to words conversion
+        const ones = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+        const tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+        const teens = ['ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+        
+        function numberToWords(num) {
+            if (num === 0) return 'zero';
+            if (num < 10) return ones[num];
+            if (num < 20) return teens[num - 10];
+            if (num < 100) {
+                return tens[Math.floor(num / 10)] + (num % 10 !== 0 ? ' ' + ones[num % 10] : '');
+            }
+            if (num < 1000) {
+                return ones[Math.floor(num / 100)] + ' hundred' + (num % 100 !== 0 ? ' ' + numberToWords(num % 100) : '');
+            }
+            if (num < 1000000) {
+                return numberToWords(Math.floor(num / 1000)) + ' thousand' + (num % 1000 !== 0 ? ' ' + numberToWords(num % 1000) : '');
+            }
+            return num.toString();
+        }
+        
+        // Convert year format (e.g., 2025 -> "twenty twenty five")
+        function yearToWords(year) {
+            const yearNum = parseInt(year);
+            if (yearNum >= 2000 && yearNum <= 2099) {
+                const firstPart = Math.floor(yearNum / 100);
+                const secondPart = yearNum % 100;
+                return numberToWords(firstPart) + ' ' + (secondPart === 0 ? 'hundred' : numberToWords(secondPart));
+            }
+            return numberToWords(yearNum);
+        }
+        
+        // Normalize abbreviations
+        const abbreviations = {
+            'dr': 'doctor',
+            'mr': 'mister',
+            'mrs': 'missus',
+            'ms': 'miss',
+            'st': 'saint',
+            'ave': 'avenue',
+            'rd': 'road',
+            'blvd': 'boulevard',
+            'apt': 'apartment',
+            'dept': 'department',
+            'gov': 'government',
+            'etc': 'etcetera',
+            'vs': 'versus',
+            'approx': 'approximately',
+            'max': 'maximum',
+            'min': 'minimum'
+        };
+        
+        function normalizeText(text, options) {
+            let normalized = text;
+            
+            // Normalize hyphens first (before other processing)
+            if (options.normalizeHyphens) {
+                // Replace hyphens with spaces
+                normalized = normalized.replace(/-/g, ' ');
+            }
+            
+            // Normalize numbers
+            if (options.normalizeNumbers) {
+                // Convert digit sequences to words
+                normalized = normalized.replace(/\b(\d{4})\b/g, (match) => {
+                    // Check if it's a year-like number
+                    const num = parseInt(match);
+                    if (num >= 1900 && num <= 2100) {
+                        return yearToWords(match);
+                    }
+                    return numberToWords(num);
+                });
+                
+                // Convert other numbers
+                normalized = normalized.replace(/\b(\d+)\b/g, (match) => {
+                    return numberToWords(parseInt(match));
+                });
+            }
+            
+            // Normalize abbreviations
+            if (options.normalizeAbbreviations) {
+                const words = normalized.split(/\s+/);
+                normalized = words.map(word => {
+                    const cleaned = word.replace(/\./g, '').toLowerCase();
+                    return abbreviations[cleaned] || word;
+                }).join(' ');
+            }
+            
+            return normalized;
+        }
+        
         // Language detection function
         function detectLanguage(text) {
             // Remove whitespace for analysis
@@ -509,7 +638,17 @@
         
         // Process text based on language
         function processText(text, language) {
-            // Normalize text: remove newlines, convert to lowercase, remove punctuation
+            // Get normalization options
+            const options = {
+                normalizeNumbers: document.getElementById('normalizeNumbers').checked,
+                normalizeAbbreviations: document.getElementById('normalizeAbbreviations').checked,
+                normalizeHyphens: document.getElementById('normalizeHyphens').checked
+            };
+            
+            // Apply text normalization first
+            text = normalizeText(text, options);
+            
+            // Then apply standard cleanup
             text = text.replace(/\n/g, ' ');  // Replace newlines with spaces
             text = text.toLowerCase();  // Convert to lowercase
             text = text.replace(/[.,!?;:"""''()[\]{}]/g, '');  // Remove punctuation
