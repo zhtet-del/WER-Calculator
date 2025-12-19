@@ -382,6 +382,14 @@
                         <input type="checkbox" id="normalizeHyphens" checked>
                         Normalize hyphens (e.g., "side-by-side" ↔ "side by side")
                     </label>
+                    <label>
+                        <input type="checkbox" id="normalizeSymbols" checked>
+                        Normalize symbols (e.g., "%" ↔ "percent", "$" ↔ "dollar")
+                    </label>
+                    <label>
+                        <input type="checkbox" id="normalizeSpelling" checked>
+                        Normalize spelling variations (e.g., "recognised" ↔ "recognized")
+                    </label>
                 </div>
             </div>
             
@@ -530,6 +538,337 @@
             'min': 'minimum'
         };
         
+        // Symbol to word mappings
+        const symbols = {
+            '%': 'percent',
+            '&': 'and',
+            '@': 'at',
+            '#': 'hash',
+            '
+        
+        // Language detection function
+        function detectLanguage(text) {
+            // Remove whitespace for analysis
+            const trimmed = text.trim();
+            
+            // Check for Chinese characters
+            const chineseRegex = /[\u4e00-\u9fff]/;
+            if (chineseRegex.test(trimmed)) {
+                return 'zh';
+            }
+            
+            // Check for Tamil script
+            const tamilRegex = /[\u0B80-\u0BFF]/;
+            if (tamilRegex.test(trimmed)) {
+                return 'ta';
+            }
+            
+            // Check for common Malay words
+            const malayWords = ['yang', 'ini', 'adalah', 'untuk', 'dengan', 'pada', 'akan', 'dari', 'saya', 'tidak'];
+            const words = trimmed.toLowerCase().split(/\s+/);
+            let malayCount = 0;
+            for (let word of words) {
+                if (malayWords.includes(word)) malayCount++;
+            }
+            if (malayCount > 0 && malayCount / words.length > 0.1) {
+                return 'ms';
+            }
+            
+            // Default to English
+            return 'en';
+        }
+        
+        // Chinese word segmentation (simple character-based for now)
+        function segmentChinese(text) {
+            // Remove punctuation from Chinese text
+            text = text.replace(/[，。！？；：""''（）【】｛｝、]/g, '');
+            
+            // Split Chinese text into characters as words
+            // In production, you'd use a proper segmentation library
+            const chars = text.split('');
+            const words = [];
+            let currentWord = '';
+            
+            for (let char of chars) {
+                if (/[\u4e00-\u9fff]/.test(char)) {
+                    if (currentWord && !/[\u4e00-\u9fff]/.test(currentWord)) {
+                        words.push(currentWord.trim());
+                        currentWord = '';
+                    }
+                    currentWord += char;
+                } else if (/\s/.test(char)) {
+                    if (currentWord) {
+                        words.push(currentWord.trim());
+                        currentWord = '';
+                    }
+                } else {
+                    currentWord += char;
+                }
+            }
+            
+            if (currentWord) {
+                words.push(currentWord.trim());
+            }
+            
+            return words.filter(w => w.length > 0);
+        }
+        
+        // Process text based on language
+        function processText(text, language) {
+            // Get normalization options
+            const options = {
+                normalizeNumbers: document.getElementById('normalizeNumbers').checked,
+                normalizeAbbreviations: document.getElementById('normalizeAbbreviations').checked,
+                normalizeHyphens: document.getElementById('normalizeHyphens').checked
+            };
+            
+            // Apply text normalization first
+            text = normalizeText(text, options);
+            
+            // Then apply standard cleanup
+            text = text.replace(/\n/g, ' ');  // Replace newlines with spaces
+            text = text.toLowerCase();  // Convert to lowercase
+            text = text.replace(/[.,!?;:"""''()[\]{}]/g, '');  // Remove punctuation
+            text = text.replace(/\s+/g, ' ');  // Normalize multiple spaces to single space
+            text = text.trim();
+            
+            if (language === 'zh') {
+                // For Chinese, segment into characters/words
+                return segmentChinese(text);
+            } else {
+                // For other languages, split by whitespace
+                return text.split(/\s+/).filter(w => w.length > 0);
+            }
+        }
+        
+        function updateLanguageInfo() {
+            const language = document.getElementById('language').value;
+            const info = document.getElementById('languageInfo');
+            
+            const messages = {
+                'auto': 'Automatic language detection enabled. The system will identify the language and apply appropriate processing. Text normalization: Case-insensitive, punctuation and newlines removed.',
+                'en': 'English mode: Standard word-based tokenization. Text normalization: Case-insensitive, punctuation and newlines removed.',
+                'ms': 'Malay mode: Standard word-based tokenization. Text normalization: Case-insensitive, punctuation and newlines removed.',
+                'ta': 'Tamil mode: Standard word-based tokenization. Text normalization: Case-insensitive, punctuation and newlines removed.',
+                'zh': 'Mandarin Chinese mode: Character-based segmentation. Text normalization: Punctuation and newlines removed. 标点符号和换行符已删除。'
+            };
+            
+            info.textContent = messages[language];
+        }
+        
+        function calculateWER() {
+            const reference = document.getElementById('reference').value.trim();
+            const hypothesis = document.getElementById('hypothesis').value.trim();
+            
+            if (!reference || !hypothesis) {
+                alert('Please enter both reference and hypothesis texts.');
+                return;
+            }
+            
+            // Detect or get selected language
+            let language = document.getElementById('language').value;
+            if (language === 'auto') {
+                language = detectLanguage(reference);
+                console.log('Detected language:', language);
+            }
+            
+            // Process texts based on language
+            const refWords = processText(reference, language);
+            const hypWords = processText(hypothesis, language);
+            
+            console.log('Reference words:', refWords);
+            console.log('Hypothesis words:', hypWords);
+            
+            const result = levenshteinAlignment(refWords, hypWords);
+            
+            const totalWords = refWords.length;
+            const wer = ((result.substitutions + result.deletions + result.insertions) / totalWords) * 100;
+            const mer = ((result.substitutions + result.deletions + result.insertions) / (totalWords + result.insertions)) * 100;
+            const wil = ((result.substitutions + result.deletions) / totalWords) * 100;
+            const accuracy = Math.max(0, 100 - wer);
+            
+            document.getElementById('wer').textContent = wer.toFixed(2) + '%';
+            document.getElementById('mer').textContent = mer.toFixed(2) + '%';
+            document.getElementById('wil').textContent = wil.toFixed(2) + '%';
+            document.getElementById('accuracy').textContent = accuracy.toFixed(2) + '%';
+            
+            document.getElementById('totalWords').textContent = totalWords;
+            document.getElementById('substitutions').textContent = result.substitutions;
+            document.getElementById('deletions').textContent = result.deletions;
+            document.getElementById('insertions').textContent = result.insertions;
+            document.getElementById('matches').textContent = result.matches;
+            
+            displayAlignment(result.alignment);
+            
+            document.getElementById('results').classList.add('visible');
+        }
+        
+        function levenshteinAlignment(ref, hyp) {
+            const n = ref.length;
+            const m = hyp.length;
+            
+            const dp = Array(n + 1).fill(null).map(() => Array(m + 1).fill(0));
+            
+            for (let i = 0; i <= n; i++) dp[i][0] = i;
+            for (let j = 0; j <= m; j++) dp[0][j] = j;
+            
+            for (let i = 1; i <= n; i++) {
+                for (let j = 1; j <= m; j++) {
+                    if (ref[i-1] === hyp[j-1]) {
+                        dp[i][j] = dp[i-1][j-1];
+                    } else {
+                        dp[i][j] = Math.min(
+                            dp[i-1][j] + 1,
+                            dp[i][j-1] + 1,
+                            dp[i-1][j-1] + 1
+                        );
+                    }
+                }
+            }
+            
+            const alignment = [];
+            let i = n, j = m;
+            let substitutions = 0, deletions = 0, insertions = 0, matches = 0;
+            
+            while (i > 0 || j > 0) {
+                if (i > 0 && j > 0 && ref[i-1] === hyp[j-1]) {
+                    alignment.unshift({type: 'match', ref: ref[i-1], hyp: hyp[j-1]});
+                    matches++;
+                    i--; j--;
+                } else if (i > 0 && j > 0 && dp[i][j] === dp[i-1][j-1] + 1) {
+                    alignment.unshift({type: 'substitution', ref: ref[i-1], hyp: hyp[j-1]});
+                    substitutions++;
+                    i--; j--;
+                } else if (i > 0 && dp[i][j] === dp[i-1][j] + 1) {
+                    alignment.unshift({type: 'deletion', ref: ref[i-1], hyp: null});
+                    deletions++;
+                    i--;
+                } else {
+                    alignment.unshift({type: 'insertion', ref: null, hyp: hyp[j-1]});
+                    insertions++;
+                    j--;
+                }
+            }
+            
+            return {
+                alignment,
+                substitutions,
+                deletions,
+                insertions,
+                matches
+            };
+        }
+        
+        function displayAlignment(alignment) {
+            let refLine = 'REF: ';
+            let hypLine = 'HYP: ';
+            
+            alignment.forEach(item => {
+                if (item.type === 'match') {
+                    refLine += `<span class="word-match">${item.ref}</span> `;
+                    hypLine += `<span class="word-match">${item.hyp}</span> `;
+                } else if (item.type === 'substitution') {
+                    refLine += `<span class="word-substitution">${item.ref}</span> `;
+                    hypLine += `<span class="word-substitution">${item.hyp}</span> `;
+                } else if (item.type === 'deletion') {
+                    refLine += `<span class="word-deletion">${item.ref}</span> `;
+                    hypLine += `<span class="word-deletion">***</span> `;
+                } else if (item.type === 'insertion') {
+                    refLine += `<span class="word-insertion">***</span> `;
+                    hypLine += `<span class="word-insertion">${item.hyp}</span> `;
+                }
+            });
+            
+            document.getElementById('alignment').innerHTML = refLine + '<br><br>' + hypLine;
+        }
+    </script>
+</body>
+</html>: 'dollar',
+            '£': 'pound',
+            '€': 'euro',
+            '¥': 'yen',
+            '+': 'plus',
+            '=': 'equals',
+            '×': 'times',
+            '÷': 'divided by',
+            '<': 'less than',
+            '>': 'greater than',
+            '°': 'degree'
+        };
+        
+        // Common spelling variations (British vs American, common misspellings)
+        const spellingVariations = {
+            // British to American
+            'recognise': 'recognize',
+            'recognised': 'recognized',
+            'recognising': 'recognizing',
+            'organise': 'organize',
+            'organised': 'organized',
+            'organising': 'organizing',
+            'realise': 'realize',
+            'realised': 'realized',
+            'realising': 'realizing',
+            'colour': 'color',
+            'favour': 'favor',
+            'honour': 'honor',
+            'labour': 'labor',
+            'behaviour': 'behavior',
+            'centre': 'center',
+            'theatre': 'theater',
+            'metre': 'meter',
+            'litre': 'liter',
+            'defence': 'defense',
+            'offence': 'offense',
+            'licence': 'license',
+            'practise': 'practice',
+            'analyse': 'analyze',
+            'catalogue': 'catalog',
+            'dialogue': 'dialog',
+            'travelled': 'traveled',
+            'travelling': 'traveling',
+            'cancelled': 'canceled',
+            'cancelling': 'canceling',
+            'modelling': 'modeling',
+            'modelled': 'modeled',
+            'programme': 'program',
+            'grey': 'gray',
+            'serialise': 'serialize',
+            'summarise': 'summarize',
+            'summarised': 'summarized',
+            'optimise': 'optimize',
+            'optimised': 'optimized',
+            'minimise': 'minimize',
+            'minimised': 'minimized',
+            'maximise': 'maximize',
+            'maximised': 'maximized'
+        };
+        
+        function normalizeText(text, options) {
+            let normalized = text;
+            
+            // Normalize symbols to words
+            if (options.normalizeSymbols) {
+                for (const [symbol, word] of Object.entries(symbols)) {
+                    const escapedSymbol = symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\        // Normalize abbreviations
+        const abbreviations = {
+            'dr': 'doctor',
+            'mr': 'mister',
+            'mrs': 'missus',
+            'ms': 'miss',
+            'st': 'saint',
+            'ave': 'avenue',
+            'rd': 'road',
+            'blvd': 'boulevard',
+            'apt': 'apartment',
+            'dept': 'department',
+            'gov': 'government',
+            'etc': 'etcetera',
+            'vs': 'versus',
+            'approx': 'approximately',
+            'max': 'maximum',
+            'min': 'minimum'
+        };
+        
         function normalizeText(text, options) {
             let normalized = text;
             
@@ -563,6 +902,49 @@
                 normalized = words.map(word => {
                     const cleaned = word.replace(/\./g, '').toLowerCase();
                     return abbreviations[cleaned] || word;
+                }).join(' ');
+            }
+            
+            return normalized;
+        }');
+                    normalized = normalized.replace(new RegExp(escapedSymbol, 'g'), ' ' + word + ' ');
+                }
+            }
+            
+            // Normalize hyphens
+            if (options.normalizeHyphens) {
+                normalized = normalized.replace(/-/g, ' ');
+            }
+            
+            // Normalize numbers
+            if (options.normalizeNumbers) {
+                normalized = normalized.replace(/\b(\d{4})\b/g, (match) => {
+                    const num = parseInt(match);
+                    if (num >= 1900 && num <= 2100) {
+                        return yearToWords(match);
+                    }
+                    return numberToWords(num);
+                });
+                
+                normalized = normalized.replace(/\b(\d+)\b/g, (match) => {
+                    return numberToWords(parseInt(match));
+                });
+            }
+            
+            // Normalize abbreviations
+            if (options.normalizeAbbreviations) {
+                const words = normalized.split(/\s+/);
+                normalized = words.map(word => {
+                    const cleaned = word.replace(/\./g, '').toLowerCase();
+                    return abbreviations[cleaned] || word;
+                }).join(' ');
+            }
+            
+            // Normalize spelling variations
+            if (options.normalizeSpelling) {
+                const words = normalized.toLowerCase().split(/\s+/);
+                normalized = words.map(word => {
+                    return spellingVariations[word] || word;
                 }).join(' ');
             }
             
