@@ -474,6 +474,9 @@
         
         // Chinese word segmentation (simple character-based for now)
         function segmentChinese(text) {
+            // Remove punctuation from Chinese text
+            text = text.replace(/[，。！？；：""''（）【】｛｝、]/g, '');
+            
             // Split Chinese text into characters as words
             // In production, you'd use a proper segmentation library
             const chars = text.split('');
@@ -506,6 +509,11 @@
         
         // Process text based on language
         function processText(text, language) {
+            // Normalize text: remove newlines, convert to lowercase, remove punctuation
+            text = text.replace(/\n/g, ' ');  // Replace newlines with spaces
+            text = text.toLowerCase();  // Convert to lowercase
+            text = text.replace(/[.,!?;:"""''()[\]{}]/g, '');  // Remove punctuation
+            text = text.replace(/\s+/g, ' ');  // Normalize multiple spaces to single space
             text = text.trim();
             
             if (language === 'zh') {
@@ -522,11 +530,11 @@
             const info = document.getElementById('languageInfo');
             
             const messages = {
-                'auto': 'Automatic language detection enabled. The system will identify the language and apply appropriate processing.',
-                'en': 'English mode: Standard word-based tokenization.',
-                'ms': 'Malay mode: Standard word-based tokenization. Bahasa Melayu menggunakan tokenisasi berasaskan perkataan.',
-                'ta': 'Tamil mode: Standard word-based tokenization. தமிழ் முறை: வார்த்தை அடிப்படையிலான டோக்கனைசேஷன்.',
-                'zh': 'Mandarin Chinese mode: Character-based segmentation for accurate comparison. 中文模式：基于字符的分词以进行准确比较。'
+                'auto': 'Automatic language detection enabled. The system will identify the language and apply appropriate processing. Text normalization: Case-insensitive, punctuation and newlines removed.',
+                'en': 'English mode: Standard word-based tokenization. Text normalization: Case-insensitive, punctuation and newlines removed.',
+                'ms': 'Malay mode: Standard word-based tokenization. Text normalization: Case-insensitive, punctuation and newlines removed.',
+                'ta': 'Tamil mode: Standard word-based tokenization. Text normalization: Case-insensitive, punctuation and newlines removed.',
+                'zh': 'Mandarin Chinese mode: Character-based segmentation. Text normalization: Punctuation and newlines removed. 标点符号和换行符已删除。'
             };
             
             info.textContent = messages[language];
