@@ -758,34 +758,39 @@
             // Remove punctuation from Chinese text
             text = text.replace(/[，。！？；：""''（）【】｛｝、]/g, '');
             
-            // Split Chinese text into characters as words
-            // In production, you'd use a proper segmentation library
+            // Split text into characters
             const chars = text.split('');
             const words = [];
             let currentWord = '';
             
             for (let char of chars) {
                 if (/[\u4e00-\u9fff]/.test(char)) {
-                    if (currentWord && !/[\u4e00-\u9fff]/.test(currentWord)) {
+                    // Chinese character - add any accumulated non-Chinese word first
+                    if (currentWord.trim()) {
                         words.push(currentWord.trim());
                         currentWord = '';
                     }
-                    currentWord += char;
+                    // Add Chinese character as individual word
+                    words.push(char);
                 } else if (/\s/.test(char)) {
-                    if (currentWord) {
+                    // Whitespace - add accumulated word if any
+                    if (currentWord.trim()) {
                         words.push(currentWord.trim());
                         currentWord = '';
                     }
                 } else {
+                    // Non-Chinese, non-whitespace character (e.g., English letters, numbers)
+                    // Accumulate into current word
                     currentWord += char;
                 }
             }
             
-            if (currentWord) {
+            // Add any remaining word
+            if (currentWord.trim()) {
                 words.push(currentWord.trim());
             }
             
-            return words.filter(w => w.length > 0);
+            return words;
         }
         
         // Process text based on language
@@ -832,7 +837,7 @@
         }
         
         function calculateWER() {
-            const reference = document.getElementById('reference').value.trim();
+            let reference = document.getElementById('reference').value.trim();
             const hypothesis = document.getElementById('hypothesis').value.trim();
             const videoTitle = document.getElementById('videoTitle').value.trim();
             const modelUsed = document.getElementById('modelUsed').value.trim();
@@ -842,19 +847,45 @@
                 return;
             }
             
-            // Preserve originals for PDF/output
-            document.getElementById('refOriginal').textContent = reference;
-            document.getElementById('hypOriginal').textContent = hypothesis;
-            document.getElementById('reportTitle').textContent = videoTitle ? 'Title: ' + videoTitle : 'Transcription Report';
-            const reportModelEl = document.getElementById('reportModel');
-            reportModelEl.textContent = modelUsed ? `Model: ${modelUsed}` : '';
-            
             // Detect or get selected language
             let language = document.getElementById('language').value;
             if (language === 'auto') {
                 language = detectLanguage(reference);
                 console.log('Detected language:', language);
             }
+            
+            // For Chinese text, add spaces between words in the original hansard textarea
+            if (language === 'zh') {
+                // Get normalization options
+                const options = {
+                    normalizeNumbers: document.getElementById('normalizeNumbers').checked,
+                    normalizeAbbreviations: document.getElementById('normalizeAbbreviations').checked,
+                    normalizeHyphens: document.getElementById('normalizeHyphens').checked
+                };
+                
+                // Process the reference text to get segmented words
+                let processedRef = normalizeText(reference, options);
+                processedRef = processedRef.replace(/\n/g, ' ');
+                processedRef = processedRef.toLowerCase();
+                processedRef = processedRef.replace(/[.,!?;:"""''()[\]{}]/g, '');
+                processedRef = processedRef.replace(/\s+/g, ' ');
+                processedRef = processedRef.trim();
+                
+                // Segment Chinese text
+                const refWordsSegmented = segmentChinese(processedRef);
+                
+                // Join with spaces and update the textarea
+                const spacedReference = refWordsSegmented.join(' ');
+                document.getElementById('reference').value = spacedReference;
+                reference = spacedReference;
+            }
+            
+            // Preserve originals for PDF/output
+            document.getElementById('refOriginal').textContent = reference;
+            document.getElementById('hypOriginal').textContent = hypothesis;
+            document.getElementById('reportTitle').textContent = videoTitle ? 'Title: ' + videoTitle : 'Transcription Report';
+            const reportModelEl = document.getElementById('reportModel');
+            reportModelEl.textContent = modelUsed ? `Model: ${modelUsed}` : '';
             
             // Process texts based on language
             const refWords = processText(reference, language);
