@@ -22,7 +22,6 @@
         }
         
         .container {
-            max-width: 1400px;
             margin: 0 auto;
             background: white;
             border: 1px solid #ddd;
@@ -59,14 +58,24 @@
             border: 1px solid #e2e8f0;
         }
         
-        .language-selector label {
-            font-size: 0.95em;
-            font-weight: 600;
-            color: #1e3a8a;
-            margin-right: 16px;
+        .language-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            margin-bottom: 12px;
         }
         
-        .language-selector select {
+        .language-field label {
+            display: block;
+            font-size: 0.9em;
+            font-weight: 600;
+            color: #1e3a8a;
+            margin-bottom: 6px;
+        }
+        
+        .language-field select,
+        .language-field input {
+            width: 100%;
             padding: 8px 12px;
             font-size: 0.95em;
             border: 1px solid #cbd5e1;
@@ -74,7 +83,8 @@
             cursor: pointer;
         }
         
-        .language-selector select:focus {
+        .language-field select:focus,
+        .language-field input:focus {
             outline: none;
             border-color: #1e3a8a;
         }
@@ -153,6 +163,61 @@
             margin-bottom: 30px;
             padding-bottom: 24px;
             border-bottom: 1px solid #e5e7eb;
+        }
+        
+        .result-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+        
+        .report-header {
+            margin-bottom: 16px;
+            padding: 14px 0px;
+        }
+        
+        .report-title {
+            font-size: 2em;
+            font-weight: 700;
+            color: #1e3a8a;
+            margin-bottom: 4px;
+        }
+        
+        .report-subtitle {
+            font-size: 1.2em;
+            color: #334155;
+        }
+        
+        .input-summary {
+            background: #f8fafc;
+            margin-bottom: 20px;
+        }
+        
+        .input-summary h4 {
+            margin-bottom: 6px;
+            color: #1e3a8a;
+            font-size: 0.95em;
+        }
+        
+        .input-summary .text-block {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background: white;
+            border: 1px solid #e5e7eb;
+            padding: 10px;
+            margin-bottom: 12px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+            color: #0f172a;
+        }
+        
+        .secondary-button {
+            background: #0f172a;
+        }
+        
+        .secondary-button:hover {
+            background: #111827;
         }
         
         button {
@@ -273,6 +338,33 @@
             overflow-x: auto;
         }
         
+        .alignment-columns {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 16px;
+            align-items: start;
+        }
+        
+        .alignment-column {
+            border-left: 3px solid #e5e7eb;
+            padding-left: 12px;
+        }
+        
+        .alignment-label {
+            font-size: 0.85em;
+            font-weight: 700;
+            color: #1e3a8a;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        
+        .alignment-line {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            line-height: 1.6;
+        }
+        
         .word-match {
             color: #059669;
             font-weight: 500;
@@ -348,6 +440,37 @@
                 grid-template-columns: 1fr;
             }
         }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .header, .button-container, .result-actions, .language-selector, .input-section {
+                display: none;
+            }
+            
+            .container {
+                box-shadow: none;
+                border: none;
+            }
+            
+            .results {
+                display: block;
+            }
+            
+            .page-break {
+                display: block;
+                break-before: page !important;
+                page-break-before: always !important;
+                page-break-inside: avoid;
+            }
+            
+            .detailed-results {
+                page-break-inside: avoid;
+            }
+        }
     </style>
 </head>
 <body>
@@ -358,42 +481,54 @@
         </div>
         
         <div class="content">
-            <div class="language-selector">
-                <label for="language">Language:</label>
-                <select id="language" onchange="updateLanguageInfo()">
-                    <option value="auto">Auto-detect</option>
-                    <option value="en">English</option>
-                    <option value="ms">Malay (Bahasa Melayu)</option>
-                    <option value="ta">Tamil (தமிழ்)</option>
-                    <option value="zh">Mandarin Chinese (中文)</option>
-                </select>
+                        <div class="language-selector">
+                <div class="language-grid">
+                    <div class="language-field">
+                        <label for="language">Language</label>
+                        <select id="language" onchange="updateLanguageInfo()">
+                            <option value="auto">Auto-detect</option>
+                            <option value="en">English</option>
+                            <option value="ms">Malay (Bahasa Melayu)</option>
+                            <option value="ta">Tamil (?r?rr?r??r'?_?)</option>
+                            <option value="zh">Mandarin Chinese (?,-?-+)</option>
+                        </select>
+                    </div>
+                    <div class="language-field">
+                        <label for="videoTitle">Video Title</label>
+                        <input id="videoTitle" type="text" placeholder="e.g., Customer Support Call - 2025-03-14">
+                    </div>
+                    <div class="language-field">
+                        <label for="modelUsed">Model Used</label>
+                        <input id="modelUsed" type="text" placeholder="e.g., Whisper Large-v3">
+                    </div>
+                </div>
                 <div class="language-info" id="languageInfo">
                     Automatic language detection enabled. The system will identify the language and apply appropriate processing.
                 </div>
                 <div class="normalization-options">
                     <label>
                         <input type="checkbox" id="normalizeNumbers" checked>
-                        Normalize numbers (e.g., "2025" ↔ "twenty twenty five")
+                        Normalize numbers (e.g., "2025" ?+" "twenty twenty five")
                     </label>
                     <label>
                         <input type="checkbox" id="normalizeAbbreviations" checked>
-                        Normalize abbreviations (e.g., "Dr." ↔ "doctor", "Mr." ↔ "mister")
+                        Normalize abbreviations (e.g., "Dr." ?+" "doctor", "Mr." ?+" "mister")
                     </label>
                     <label>
                         <input type="checkbox" id="normalizeHyphens" checked>
-                        Normalize hyphens (e.g., "side-by-side" ↔ "side by side")
+                        Normalize hyphens (e.g., "side-by-side" ?+" "side by side")
                     </label>
                 </div>
             </div>
-            
+
             <div class="input-section">
                 <div class="input-box">
-                    <label>Reference Text</label>
-                    <textarea id="reference" placeholder="Enter the original reference text...">the quick brown fox jumps over the lazy dog</textarea>
+                    <label>Original Hansard</label>
+                    <textarea id="reference" placeholder="Enter the original Hansard text...">the quick brown fox jumps over the lazy dog</textarea>
                 </div>
                 <div class="input-box">
-                    <label>Hypothesis Text</label>
-                    <textarea id="hypothesis" placeholder="Enter the transcribed hypothesis text...">the quick brown fox jumped over a lazy dog</textarea>
+                    <label>AI Generated Transcription</label>
+                    <textarea id="hypothesis" placeholder="Enter the AI generated transcription...">the quick brown fox jumped over a lazy dog</textarea>
                 </div>
             </div>
             
@@ -402,6 +537,15 @@
             </div>
             
             <div class="results" id="results">
+                <div class="result-actions">
+                    <button class="secondary-button" onclick="saveAsPDF()">Save as PDF</button>
+                </div>
+                
+                <div class="report-header">
+                    <div class="report-title" id="reportTitle">Transcription Report</div>
+                    <div class="report-subtitle" id="reportModel"></div>
+                </div>
+                
                 <h2 class="section-title">Performance Metrics</h2>
                 <div class="metrics">
                     <div class="metric-card primary">
@@ -426,7 +570,7 @@
                     <h3 class="section-title">Error Analysis</h3>
                     <div class="error-breakdown">
                         <div class="error-item">
-                            <div class="error-type">Reference Words</div>
+                        <div class="error-type">Original Hansard Words</div>
                             <div class="error-count" id="totalWords">0</div>
                         </div>
                         <div class="error-item">
@@ -448,11 +592,18 @@
                     </div>
                     
                     <div class="formula">
-                        WER = (Substitutions + Deletions + Insertions) / Total Reference Words × 100%
+                        WER = (Substitutions + Deletions + Insertions) / Total Original Hansard Words × 100%
                     </div>
                 </div>
                 
-                <div class="detailed-results">
+                <div class="input-summary">
+                    <h4 class="page-break" style="page-break-before: always;">Original Hansard</h4>
+                    <div class="text-block" id="refOriginal"></div>
+                    <h4 class="page-break" style="page-break-before: always;">AI Generated Transcription</h4>
+                    <div class="text-block" id="hypOriginal"></div>
+                </div>
+                
+                <div class="detailed-results page-break" style="page-break-before: always;">
                     <h3 class="section-title">Alignment Visualization</h3>
                     <div class="legend">
                         <div class="legend-item">
@@ -683,11 +834,20 @@
         function calculateWER() {
             const reference = document.getElementById('reference').value.trim();
             const hypothesis = document.getElementById('hypothesis').value.trim();
+            const videoTitle = document.getElementById('videoTitle').value.trim();
+            const modelUsed = document.getElementById('modelUsed').value.trim();
             
             if (!reference || !hypothesis) {
-                alert('Please enter both reference and hypothesis texts.');
+                alert('Please enter both the Original Hansard and the AI Generated Transcription.');
                 return;
             }
+            
+            // Preserve originals for PDF/output
+            document.getElementById('refOriginal').textContent = reference;
+            document.getElementById('hypOriginal').textContent = hypothesis;
+            document.getElementById('reportTitle').textContent = videoTitle ? 'Title: ' + videoTitle : 'Transcription Report';
+            const reportModelEl = document.getElementById('reportModel');
+            reportModelEl.textContent = modelUsed ? `Model: ${modelUsed}` : '';
             
             // Detect or get selected language
             let language = document.getElementById('language').value;
@@ -700,8 +860,8 @@
             const refWords = processText(reference, language);
             const hypWords = processText(hypothesis, language);
             
-            console.log('Reference words:', refWords);
-            console.log('Hypothesis words:', hypWords);
+            console.log('Original Hansard words:', refWords);
+            console.log('AI transcription words:', hypWords);
             
             const result = levenshteinAlignment(refWords, hypWords);
             
@@ -725,6 +885,14 @@
             displayAlignment(result.alignment);
             
             document.getElementById('results').classList.add('visible');
+        }
+        
+        function saveAsPDF() {
+            if (!document.getElementById('results').classList.contains('visible')) {
+                alert('Please calculate metrics before saving the results.');
+                return;
+            }
+            window.print();
         }
         
         function levenshteinAlignment(ref, hyp) {
@@ -784,8 +952,8 @@
         }
         
         function displayAlignment(alignment) {
-            let refLine = 'REF: ';
-            let hypLine = 'HYP: ';
+            let refLine = '';
+            let hypLine = '';
             
             alignment.forEach(item => {
                 if (item.type === 'match') {
@@ -803,8 +971,22 @@
                 }
             });
             
-            document.getElementById('alignment').innerHTML = refLine + '<br><br>' + hypLine;
+            const alignmentHtml = `
+                <div class="alignment-columns">
+                    <div class="alignment-column">
+                        <div class="alignment-label">REF</div>
+                        <div class="alignment-line">${refLine.trim()}</div>
+                    </div>
+                    <div class="alignment-column">
+                        <div class="alignment-label">HYP</div>
+                        <div class="alignment-line">${hypLine.trim()}</div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('alignment').innerHTML = alignmentHtml;
         }
     </script>
 </body>
 </html>
+
