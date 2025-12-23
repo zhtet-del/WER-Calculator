@@ -488,9 +488,9 @@
                         <select id="language" onchange="updateLanguageInfo()">
                             <option value="auto">Auto-detect</option>
                             <option value="en">English</option>
-                            <option value="ms">Malay (Bahasa Melayu)</option>
-                            <option value="ta">Tamil (?r?rr?r??r'?_?)</option>
-                            <option value="zh">Mandarin Chinese (?,-?-+)</option>
+                            <option value="ms">Malay</option>
+                            <option value="ta">Tamil</option>
+                            <option value="zh">Mandarin Chinese</option>
                         </select>
                     </div>
                     <div class="language-field">
@@ -518,16 +518,30 @@
                         <input type="checkbox" id="normalizeHyphens" checked>
                         Normalize hyphens (e.g., "side-by-side" ?+" "side by side")
                     </label>
+                    <label>
+                        <input type="checkbox" id="normalizeUsToUk" checked>
+                        Convert US to UK English (e.g., "optimize" ?+" "optimise", "minimizing" ?+" "minimising")
+                    </label>
+                </div>
+                <div class="language-grid" style="margin-top: 12px;">
+                    <div class="language-field">
+                        <label for="label1">First Text Box Label</label>
+                        <input id="label1" type="text" value="Original Hansard" onchange="updateLabels()">
+                    </div>
+                    <div class="language-field">
+                        <label for="label2">Second Text Box Label</label>
+                        <input id="label2" type="text" value="AI Generated Transcription" onchange="updateLabels()">
+                    </div>
                 </div>
             </div>
 
             <div class="input-section">
                 <div class="input-box">
-                    <label>Original Hansard</label>
+                    <label id="labelText1">Original Hansard</label>
                     <textarea id="reference" placeholder="Enter the original Hansard text...">the quick brown fox jumps over the lazy dog</textarea>
                 </div>
                 <div class="input-box">
-                    <label>AI Generated Transcription</label>
+                    <label id="labelText2">AI Generated Transcription</label>
                     <textarea id="hypothesis" placeholder="Enter the AI generated transcription...">the quick brown fox jumped over a lazy dog</textarea>
                 </div>
             </div>
@@ -570,7 +584,7 @@
                     <h3 class="section-title">Error Analysis</h3>
                     <div class="error-breakdown">
                         <div class="error-item">
-                        <div class="error-type">Original Hansard Words</div>
+                        <div class="error-type">Original Words</div>
                             <div class="error-count" id="totalWords">0</div>
                         </div>
                         <div class="error-item">
@@ -592,14 +606,14 @@
                     </div>
                     
                     <div class="formula">
-                        WER = (Substitutions + Deletions + Insertions) / Total Original Hansard Words × 100%
+                        WER = (Substitutions + Deletions + Insertions) / Total Original Words × 100%
                     </div>
                 </div>
                 
                 <div class="input-summary">
-                    <h4 class="page-break" style="page-break-before: always;">Original Hansard</h4>
+                    <h4 class="page-break" style="page-break-before: always;" id="label1-f">Original Hansard</h4>
                     <div class="text-block" id="refOriginal"></div>
-                    <h4 class="page-break" style="page-break-before: always;">AI Generated Transcription</h4>
+                    <h4 class="page-break" style="page-break-before: always;" id="label2-f">AI Generated Transcription</h4>
                     <div class="text-block" id="hypOriginal"></div>
                 </div>
                 
@@ -682,8 +696,81 @@
             'min': 'minimum'
         };
         
+        // US to UK English spelling conversions
+        const usToUk = {
+            'ize': 'ise',     // optimize -> optimise
+            'ization': 'isation',  // organization -> organisation
+            'ized': 'ised',        // organized -> organised
+            'yze': 'yse',          // analyze -> analyse
+            'yzing': 'ysing',      // analyzing -> analysing
+            'yzed': 'ysed',        // analyzed -> analysed
+            'or': 'our',           // color -> colour (but be careful with words like "or")
+            'er': 're',            // center -> centre (but be careful with many words)
+            'ense': 'ence',        // defense -> defence
+            'og': 'ogue',          // catalog -> catalogue
+            'eling': 'elling',     // traveling -> travelling
+            'eled': 'elled'        // traveled -> travelled
+        };
+        
+        // Specific US to UK word mappings (more reliable than suffix rules)
+        const usToUkWords = {
+            'optimize': 'optimise',
+            'optimizing': 'optimising',
+            'optimized': 'optimised',
+            'optimization': 'optimisation',
+            'minimize': 'minimise',
+            'minimizing': 'minimising',
+            'minimized': 'minimised',
+            'minimization': 'minimisation',
+            'organize': 'organise',
+            'organizing': 'organising',
+            'organized': 'organised',
+            'organization': 'organisation',
+            'analyze': 'analyse',
+            'analyzing': 'analysing',
+            'analyzed': 'analysed',
+            'color': 'colour',
+            'colors': 'colours',
+            'colored': 'coloured',
+            'coloring': 'colouring',
+            'favor': 'favour',
+            'favors': 'favours',
+            'favored': 'favoured',
+            'favorite': 'favourite',
+            'honor': 'honour',
+            'honors': 'honours',
+            'honored': 'honoured',
+            'center': 'centre',
+            'centers': 'centres',
+            'defense': 'defence',
+            'license': 'licence',
+            'offense': 'offence',
+            'catalog': 'catalogue',
+            'dialog': 'dialogue',
+            'traveling': 'travelling',
+            'traveled': 'travelled',
+            'traveler': 'traveller',
+            'canceled': 'cancelled',
+            'canceling': 'cancelling',
+            'meter': 'metre',
+            'meters': 'metres',
+            'liter': 'litre',
+            'liters': 'litres',
+            'theater': 'theatre',
+            'theaters': 'theatres'
+        };
+        
         function normalizeText(text, options) {
             let normalized = text;
+            
+            // Convert US to UK English
+            if (options.normalizeUsToUk) {
+                const words = normalized.split(/\b/);
+                normalized = words.map(word => {
+                    const lowerWord = word.toLowerCase();
+                    return usToUkWords[lowerWord] || word;
+                }).join('');
+            }
             
             // Normalize hyphens first (before other processing)
             if (options.normalizeHyphens) {
@@ -799,7 +886,9 @@
             const options = {
                 normalizeNumbers: document.getElementById('normalizeNumbers').checked,
                 normalizeAbbreviations: document.getElementById('normalizeAbbreviations').checked,
-                normalizeHyphens: document.getElementById('normalizeHyphens').checked
+                normalizeHyphens: document.getElementById('normalizeHyphens').checked,
+                normalizeUsToUk: document.getElementById('normalizeUsToUk').checked,
+                normalizeUsToUk: document.getElementById('normalizeUsToUk').checked
             };
             
             // Apply text normalization first
@@ -834,6 +923,16 @@
             };
             
             info.textContent = messages[language];
+        }
+        
+        function updateLabels() {
+            const label1 = document.getElementById('label1').value.trim() || 'Original Hansard';
+            const label2 = document.getElementById('label2').value.trim() || 'AI Generated Transcription';
+            
+            document.getElementById('labelText1').textContent = label1;
+            document.getElementById('labelText2').textContent = label2;
+            document.getElementById('label1-f').textContent = label1;
+            document.getElementById('label2-f').textContent = label2;
         }
         
         function calculateWER() {
