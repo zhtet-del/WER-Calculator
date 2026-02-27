@@ -522,6 +522,14 @@
                         <input type="checkbox" id="normalizeUsToUk" checked>
                         Convert US to UK English (e.g., "optimize" ?+" "optimise", "minimizing" ?+" "minimising")
                     </label>
+                    <label>
+                        <input type="checkbox" id="normalizeContractions" checked>
+                        Normalize contractions (e.g., "can't" -> "cannot", "we'll" -> "we will")
+                    </label>
+                    <label>
+                        <input type="checkbox" id="normalizeFillers" checked>
+                        Remove filler words (e.g., "uh", "um", "mhmm", "mm-mm", "uh-uh", "uh-huh", "nuh-uh")
+                    </label>
                 </div>
                 <div class="language-grid" style="margin-top: 12px;">
                     <div class="language-field">
@@ -759,6 +767,106 @@
             'theater': 'theatre',
             'theaters': 'theatres'
         };
+
+        // Irregular and ambiguous contractions that should not rely only on suffix rules
+        const contractionOverrides = {
+            "'cause": "because",
+            "ain't": "is not",
+            "can't": "cannot",
+            "let's": "let us",
+            "o'clock": "of the clock",
+            "shan't": "shall not",
+            "won't": "will not",
+            "y'all": "you all",
+            "he's": "he is",
+            "here's": "here is",
+            "how's": "how is",
+            "it's": "it is",
+            "she's": "she is",
+            "that's": "that is",
+            "there's": "there is",
+            "they're": "they are",
+            "what's": "what is",
+            "where's": "where is",
+            "who's": "who is",
+            "why's": "why is",
+            "i'd": "i would",
+            "he'd": "he would",
+            "she'd": "she would",
+            "we'd": "we would",
+            "they'd": "they would",
+            "there'd": "there would"
+        };
+
+        // Productive contraction endings. Add or update here to keep normalization maintainable.
+        const contractionSuffixRules = [
+            { suffix: "'ll", expansion: " will" },
+            { suffix: "'ve", expansion: " have" },
+            { suffix: "'re", expansion: " are" },
+            { suffix: "'m", expansion: " am" },
+            { suffix: "'d", expansion: " would" },
+            { suffix: "n't", expansion: " not" }
+        ];
+
+        // Keep filler terms centralized so the normalization list is easy to maintain.
+        const fillerWords = [
+            'uh',
+            'um',
+            'mhmm',
+            'mm-mm',
+            'uh-uh',
+            'uh-huh',
+            'nuh-uh'
+        ];
+
+        function escapeRegex(text) {
+            return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        const fillerWordPattern = new RegExp(
+            `\\b(?:${fillerWords
+                .map(word => word.split('-').map(part => escapeRegex(part)).join('(?:-|\\s+)'))
+                .join('|')})\\b`,
+            'gi'
+        );
+
+        function normalizeContractions(text) {
+            const standardizedApostrophes = text.replace(/[’]/g, "'");
+
+            return standardizedApostrophes.replace(/\b[a-z]+(?:'[a-z]+)+\b/gi, (token) => {
+                const lowerToken = token.toLowerCase();
+
+                if (Object.prototype.hasOwnProperty.call(contractionOverrides, lowerToken)) {
+                    return contractionOverrides[lowerToken];
+                }
+
+                for (const rule of contractionSuffixRules) {
+                    if (!lowerToken.endsWith(rule.suffix)) {
+                        continue;
+                    }
+
+                    const base = lowerToken.slice(0, -rule.suffix.length);
+                    if (!base) {
+                        return token;
+                    }
+
+                    // These stems are handled via explicit overrides (can't, won't, shan't, ain't).
+                    if (rule.suffix === "n't" && ['ca', 'wo', 'sha', 'ai'].includes(base)) {
+                        return token;
+                    }
+
+                    return base + rule.expansion;
+                }
+
+                return token;
+            });
+        }
+
+        function normalizeFillers(text) {
+            return text
+                .replace(fillerWordPattern, ' ')
+                .replace(/\s{2,}/g, ' ');
+        }
         
         function normalizeText(text, options) {
             let normalized = text;
@@ -770,6 +878,15 @@
                     const lowerWord = word.toLowerCase();
                     return usToUkWords[lowerWord] || word;
                 }).join('');
+            }
+
+            // Normalize contractions before punctuation removal
+            if (options.normalizeContractions) {
+                normalized = normalizeContractions(normalized);
+            }
+
+            if (options.normalizeFillers) {
+                normalized = normalizeFillers(normalized);
             }
             
             // Normalize hyphens first (before other processing)
@@ -888,7 +1005,8 @@
                 normalizeAbbreviations: document.getElementById('normalizeAbbreviations').checked,
                 normalizeHyphens: document.getElementById('normalizeHyphens').checked,
                 normalizeUsToUk: document.getElementById('normalizeUsToUk').checked,
-                normalizeUsToUk: document.getElementById('normalizeUsToUk').checked
+                normalizeContractions: document.getElementById('normalizeContractions').checked,
+                normalizeFillers: document.getElementById('normalizeFillers').checked
             };
             
             // Apply text normalization first
@@ -959,7 +1077,10 @@
                 const options = {
                     normalizeNumbers: document.getElementById('normalizeNumbers').checked,
                     normalizeAbbreviations: document.getElementById('normalizeAbbreviations').checked,
-                    normalizeHyphens: document.getElementById('normalizeHyphens').checked
+                    normalizeHyphens: document.getElementById('normalizeHyphens').checked,
+                    normalizeUsToUk: document.getElementById('normalizeUsToUk').checked,
+                    normalizeContractions: document.getElementById('normalizeContractions').checked,
+                    normalizeFillers: document.getElementById('normalizeFillers').checked
                 };
                 
                 // Process the reference text to get segmented words
